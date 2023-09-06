@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>PDF Viewer with Streams</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.12.313/pdf.min.js"></script>
+    <style>
+        #pdfViewerContainer {
+            display: flex;
+            height: 800px;
+            width: 640px;
+            overflow: auto;
+            align-items: center;
+            flex-direction: column;
+        }
+
+        canvas {
+            display: block;
+        }
+    </style>
+</head>
+
+<body>
+    <input type="file" id="pdfFileInput">
+    <div id="pdfViewerContainer"></div>
+
+    <script>
+        // Function to handle file input change
+        document.getElementById('pdfFileInput').addEventListener('change', function (event) {
+            const file = event.target.files[0];
+            if (file) {
+                renderPdf(file);
+            }
+        });
+
+        // Function to render PDF using PDF.js
+        async function renderPdf(file) {
+            const pdfData = await readStreamAsArrayBuffer(file);
+            const pdfViewerContainer = document.getElementById('pdfViewerContainer');
+            pdfViewerContainer.innerHTML = ''; // Clear the container before rendering the PDF
+
+            pdfjsLib.getDocument({ data: pdfData }).promise.then(function (pdf) {
+                const totalPages = pdf.numPages;
+
+                // Loop through all pages and render them
+                for (let pageNumber = 1; pageNumber <= totalPages; pageNumber++) {
+                    pdf.getPage(pageNumber).then(function (page) {
+                        const canvas = document.createElement('canvas');
+                        const context = canvas.getContext('2d');
+                        const viewport = page.getViewport({ scale: 1.0 });
+
+                        canvas.width = viewport.width;
+                        canvas.height = viewport.height;
+
+                        const renderContext = {
+                            canvasContext: context,
+                            viewport: viewport,
+                        };
+
+                        page.render(renderContext).promise.then(function () {
+                            pdfViewerContainer.appendChild(canvas);
+                        });
+                    });
+                }
+            });
+        }
+
+        // Function to read a file as an ArrayBuffer using streams
+        async function readStreamAsArrayBuffer(file) {
+            const reader = file.stream().getReader();
+            const chunks = [];
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) {
+                    break;
+                }
+                chunks.push(value);
+            }
+            const concatenated = new Uint8Array(chunks.reduce((acc, chunk) => [...acc, ...chunk], []));
+            return concatenated.buffer;
+        }
+    </script>
+</body>
+
+</html>
